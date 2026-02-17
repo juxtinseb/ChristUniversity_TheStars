@@ -14,7 +14,7 @@ const iconMap = {
 };
 
 export default function ResourceCard({ resource, index = 0 }) {
-    const { likeResource, toggleBookmark, isBookmarked, getAverageRating } = useResources();
+    const { likeResource, toggleBookmark, isBookmarked, getAverageRating, getReviewsForResource } = useResources();
     const { isAuthenticated, setShowAuthModal, canAccessResource } = useAuth();
 
     const typeInfo = RESOURCE_TYPES.find(t => t.id === resource.type) || RESOURCE_TYPES[0];
@@ -22,7 +22,8 @@ export default function ResourceCard({ resource, index = 0 }) {
     const bookmarked = isBookmarked(resource.id);
     const isPrivate = resource.privacy === 'private';
     const hasAccess = canAccessResource(resource);
-    const { average: avgRating, count: reviewCount } = getAverageRating(resource.id);
+    const avgRating = getAverageRating(resource.id);
+    const reviewCount = getReviewsForResource(resource.id).length;
 
     const handleLike = (e) => {
         e.preventDefault();
@@ -89,14 +90,12 @@ export default function ResourceCard({ resource, index = 0 }) {
                 <p className="card-desc">{resource.description}</p>
 
                 {/* Rating Summary */}
-                {(avgRating > 0 || resource.rating > 0) && (
+                {avgRating > 0 && (
                     <div className="card-rating">
-                        <div className="card-stars">
-                            {renderStars(avgRating || resource.rating)}
-                        </div>
-                        <span className="card-rating-value">{avgRating || resource.rating}</span>
+                        <div className="card-stars">{renderStars(avgRating)}</div>
+                        <span className="card-rating-value">{avgRating}</span>
                         {reviewCount > 0 && (
-                            <span className="card-review-count">({reviewCount} review{reviewCount !== 1 ? 's' : ''})</span>
+                            <span className="card-review-count">({reviewCount})</span>
                         )}
                     </div>
                 )}
@@ -118,7 +117,6 @@ export default function ResourceCard({ resource, index = 0 }) {
                     <span className="card-time">{timeAgo(resource.createdAt)}</span>
                 </div>
 
-                {/* Private access indicator */}
                 {isPrivate && (
                     <div className={`access-indicator ${hasAccess ? 'has-access' : 'no-access'}`}>
                         {hasAccess ? (
@@ -132,7 +130,7 @@ export default function ResourceCard({ resource, index = 0 }) {
                 <div className="card-footer">
                     <div className="card-author">
                         <div className="author-avatar" style={{ background: typeInfo.color }}>
-                            {resource.author.charAt(0)}
+                            {(resource.author || 'U').charAt(0)}
                         </div>
                         <div className="author-info-col">
                             <span className="author-name">{resource.author}</span>
@@ -144,7 +142,7 @@ export default function ResourceCard({ resource, index = 0 }) {
 
                     <div className="card-stats">
                         <button className="stat-btn" onClick={handleLike}>
-                            <Heart size={14} fill={resource.likes > 0 ? 'currentColor' : 'none'} />
+                            <Heart size={14} />
                             <span>{resource.likes}</span>
                         </button>
                         <div className="stat-item">

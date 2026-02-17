@@ -10,7 +10,6 @@ import {
 import { useResources } from '../context/ResourceContext';
 import { useAuth } from '../context/AuthContext';
 import { RESOURCE_TYPES } from '../data/mockData';
-import ResourceCard from '../components/ResourceCard';
 import './ResourceDetail.css';
 
 const iconMap = {
@@ -19,7 +18,6 @@ const iconMap = {
 
 function StarRating({ rating, onRate, size = 20, interactive = false }) {
     const [hover, setHover] = useState(0);
-
     return (
         <div className="star-rating-input">
             {Array.from({ length: 5 }, (_, i) => {
@@ -34,10 +32,7 @@ function StarRating({ rating, onRate, size = 20, interactive = false }) {
                         onMouseLeave={() => interactive && setHover(0)}
                         style={{ cursor: interactive ? 'pointer' : 'default' }}
                     >
-                        <Star
-                            size={size}
-                            fill={value <= (hover || rating) ? 'currentColor' : 'none'}
-                        />
+                        <Star size={size} fill={value <= (hover || rating) ? 'currentColor' : 'none'} />
                     </button>
                 );
             })}
@@ -50,7 +45,8 @@ export default function ResourceDetail() {
     const navigate = useNavigate();
     const {
         getResourceById, likeResource, downloadResource, toggleBookmark, isBookmarked,
-        searchResources, getReviewsForResource, getUserReview, getAverageRating, addReview, deleteReview
+        getReviewsForResource, getUserReview, getAverageRating, addReview, deleteReview,
+        searchResources
     } = useResources();
     const { isAuthenticated, user, setShowAuthModal, canAccessResource } = useAuth();
 
@@ -75,18 +71,49 @@ export default function ResourceDetail() {
         );
     }
 
+    // Access control for private resources
+    if (!canAccessResource(resource)) {
+        return (
+            <div className="detail-page">
+                <div className="container">
+                    <button className="btn btn-ghost back-btn" onClick={() => navigate(-1)}>
+                        <ArrowLeft size={18} /> Back
+                    </button>
+                    <motion.div className="access-denied glass" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                        <div className="access-denied-icon"><Shield size={48} /></div>
+                        <h2>Access Restricted</h2>
+                        <p className="access-denied-title">{resource.title}</p>
+                        <div className="access-denied-info">
+                            <Lock size={16} />
+                            <span>This resource is <strong>Private</strong> and only accessible to students from <strong>{resource.authorCollege}</strong></span>
+                        </div>
+                        {!isAuthenticated ? (
+                            <div className="access-denied-action">
+                                <p>Log in with your {resource.authorCollege} account to access this resource.</p>
+                                <button className="btn btn-primary" onClick={() => setShowAuthModal(true)}>Log In / Sign Up</button>
+                            </div>
+                        ) : (
+                            <div className="access-denied-action">
+                                <p>Your college: <strong>{user.college}</strong></p>
+                                <p className="access-denied-note">You need to be registered with {resource.authorCollege} to access this resource.</p>
+                            </div>
+                        )}
+                        <Link to="/browse" className="btn btn-secondary" style={{ marginTop: '8px' }}>Browse Public Resources</Link>
+                    </motion.div>
+                </div>
+            </div>
+        );
+    }
+
     const typeInfo = RESOURCE_TYPES.find(t => t.id === resource.type) || RESOURCE_TYPES[0];
     const TypeIcon = iconMap[typeInfo.icon] || BookOpen;
     const bookmarked = isBookmarked(resource.id);
     const isPrivate = resource.privacy === 'private';
-    const hasAccess = canAccessResource(resource);
-    const { average: avgRating, count: reviewCount } = getAverageRating(resource.id);
-    const allReviews = getReviewsForResource(resource.id);
+    const reviews = getReviewsForResource(resource.id);
+    const avgRating = getAverageRating(resource.id);
     const userReview = user ? getUserReview(resource.id, user.id) : null;
-
     const relatedResources = searchResources('', { subject: resource.subject })
-        .filter(r => r.id !== resource.id)
-        .slice(0, 3);
+        .filter(r => r.id !== resource.id).slice(0, 3);
 
     const handleLike = () => {
         if (!isAuthenticated) { setShowAuthModal(true); return; }
@@ -94,7 +121,6 @@ export default function ResourceDetail() {
     };
 
     const handleDownload = () => {
-        if (isPrivate && !hasAccess) return;
         downloadResource(resource.id);
     };
 
@@ -107,7 +133,14 @@ export default function ResourceDetail() {
         e.preventDefault();
         if (!isAuthenticated) { setShowAuthModal(true); return; }
         if (reviewRating === 0) return;
-        addReview(resource.id, user.id, user.name, user.college || '', reviewRating, reviewComment);
+        addReview({
+            resourceId: resource.id,
+            userId: user.id,
+            userName: user.name,
+            userCollege: user.college,
+            rating: reviewRating,
+            comment: reviewComment,
+        });
         setReviewRating(0);
         setReviewComment('');
         setShowReviewForm(false);
@@ -131,11 +164,8 @@ export default function ResourceDetail() {
 
     const handleWriteReview = () => {
         if (!isAuthenticated) { setShowAuthModal(true); return; }
-        if (userReview) {
-            handleEditReview();
-        } else {
-            setShowReviewForm(true);
-        }
+        if (userReview) handleEditReview();
+        else setShowReviewForm(true);
     };
 
     const formatDate = (dateStr) => {
@@ -144,64 +174,15 @@ export default function ResourceDetail() {
         });
     };
 
-    // Access denied gate
-    if (isPrivate && !hasAccess) {
-        return (
-            <div className="detail-page">
-                <div className="container">
-                    <button className="btn btn-ghost back-btn" onClick={() => navigate(-1)}>
-                        <ArrowLeft size={18} /> Back
-                    </button>
-                    <motion.div
-                        className="access-denied glass"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                    >
-                        <div className="access-denied-icon">
-                            <Shield size={48} />
-                        </div>
-                        <h2>Access Restricted</h2>
-                        <p className="access-denied-title">{resource.title}</p>
-                        <div className="access-denied-info">
-                            <Lock size={16} />
-                            <span>This resource is <strong>Private</strong> and only accessible to students from <strong>{resource.authorCollege}</strong></span>
-                        </div>
-                        {!isAuthenticated ? (
-                            <div className="access-denied-action">
-                                <p>Log in with your {resource.authorCollege} account to access this resource.</p>
-                                <button className="btn btn-primary" onClick={() => setShowAuthModal(true)}>
-                                    Log In / Sign Up
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="access-denied-action">
-                                <p>Your college: <strong>{user.college}</strong></p>
-                                <p className="access-denied-note">You need to be registered with {resource.authorCollege} to access this resource.</p>
-                            </div>
-                        )}
-                        <Link to="/browse" className="btn btn-secondary" style={{ marginTop: '8px' }}>
-                            Browse Public Resources
-                        </Link>
-                    </motion.div>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="detail-page">
             <div className="container">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4 }}
-                >
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
                     <button className="btn btn-ghost back-btn" onClick={() => navigate(-1)}>
                         <ArrowLeft size={18} /> Back
                     </button>
 
                     <div className="detail-layout">
-                        {/* Main Content */}
                         <div className="detail-main">
                             <div className="detail-card glass">
                                 <div className="detail-header">
@@ -219,51 +200,38 @@ export default function ResourceDetail() {
 
                                 <h1 className="detail-title">{resource.title}</h1>
 
-                                {/* Rating Summary */}
                                 <div className="detail-rating-summary">
-                                    <StarRating rating={Math.round(avgRating || resource.rating)} size={18} />
-                                    <span className="rating-avg">{avgRating || resource.rating || '—'}</span>
-                                    <span className="rating-count">
-                                        ({reviewCount} review{reviewCount !== 1 ? 's' : ''})
-                                    </span>
+                                    <StarRating rating={Math.round(avgRating)} size={18} />
+                                    <span className="rating-avg">{avgRating || '—'}</span>
+                                    <span className="rating-count">({reviews.length} review{reviews.length !== 1 ? 's' : ''})</span>
                                 </div>
 
                                 <div className="detail-meta">
                                     <div className="detail-author">
                                         <div className="detail-avatar" style={{ background: typeInfo.color }}>
-                                            {resource.author.charAt(0)}
+                                            {(resource.author || 'U').charAt(0)}
                                         </div>
                                         <div>
                                             <span className="detail-author-name">{resource.author}</span>
                                             {resource.authorCollege && (
-                                                <span className="detail-college">
-                                                    <Building2 size={12} /> {resource.authorCollege}
-                                                </span>
+                                                <span className="detail-college"><Building2 size={12} /> {resource.authorCollege}</span>
                                             )}
-                                            <span className="detail-date">
-                                                <Calendar size={12} /> {formatDate(resource.createdAt)}
-                                            </span>
+                                            <span className="detail-date"><Calendar size={12} /> {formatDate(resource.createdAt)}</span>
                                         </div>
                                     </div>
                                     <div className="detail-subject tag tag-primary">{resource.subject}</div>
                                 </div>
 
-                                {/* Tags */}
                                 {resource.tags && resource.tags.length > 0 && (
                                     <div className="detail-tags">
                                         {resource.tags.map(tag => (
-                                            <Link key={tag} to={`/browse?q=${encodeURIComponent(tag)}`} className="detail-tag">
-                                                #{tag}
-                                            </Link>
+                                            <Link key={tag} to={`/browse?q=${encodeURIComponent(tag)}`} className="detail-tag">#{tag}</Link>
                                         ))}
                                     </div>
                                 )}
 
                                 {resource.branch && (
-                                    <div className="detail-branch">
-                                        <GraduationCap size={14} />
-                                        <span>{resource.branch}</span>
-                                    </div>
+                                    <div className="detail-branch"><GraduationCap size={14} /><span>{resource.branch}</span></div>
                                 )}
 
                                 <div className="detail-description">
@@ -271,7 +239,6 @@ export default function ResourceDetail() {
                                     <p>{resource.description}</p>
                                 </div>
 
-                                {/* Preview Area */}
                                 <div className="detail-preview glass">
                                     <div className="preview-placeholder">
                                         <Eye size={40} />
@@ -281,19 +248,16 @@ export default function ResourceDetail() {
                                 </div>
                             </div>
 
-                            {/* ─── Reviews Section ─── */}
+                            {/* Reviews Section */}
                             <div className="reviews-section">
                                 <div className="reviews-header">
                                     <div className="reviews-header-left">
-                                        <h2>
-                                            <MessageSquare size={22} />
-                                            Reviews & Ratings
-                                        </h2>
-                                        {reviewCount > 0 && (
+                                        <h2><MessageSquare size={22} /> Reviews & Ratings</h2>
+                                        {reviews.length > 0 && (
                                             <div className="reviews-summary-inline">
                                                 <StarRating rating={Math.round(avgRating)} size={16} />
                                                 <span className="reviews-avg-inline">{avgRating}</span>
-                                                <span className="reviews-count-inline">· {reviewCount} review{reviewCount !== 1 ? 's' : ''}</span>
+                                                <span className="reviews-count-inline">· {reviews.length} review{reviews.length !== 1 ? 's' : ''}</span>
                                             </div>
                                         )}
                                     </div>
@@ -304,16 +268,10 @@ export default function ResourceDetail() {
                                     )}
                                 </div>
 
-                                {/* Review Form */}
                                 {showReviewForm && (
-                                    <motion.form
-                                        className="review-form glass"
-                                        onSubmit={handleSubmitReview}
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                    >
+                                    <motion.form className="review-form glass" onSubmit={handleSubmitReview}
+                                        initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
                                         <h3>{editingReview ? 'Edit Your Review' : 'Write a Review'}</h3>
-
                                         <div className="review-rating-row">
                                             <label>Your Rating *</label>
                                             <StarRating rating={reviewRating} onRate={setReviewRating} size={28} interactive />
@@ -323,50 +281,32 @@ export default function ResourceDetail() {
                                                 </span>
                                             )}
                                         </div>
-
                                         <div className="input-group">
                                             <label htmlFor="review-comment">Your Review</label>
-                                            <textarea
-                                                id="review-comment"
-                                                className="input-field textarea"
-                                                placeholder="Share your experience with this resource..."
-                                                rows={4}
-                                                value={reviewComment}
-                                                onChange={(e) => setReviewComment(e.target.value)}
-                                            />
+                                            <textarea id="review-comment" className="input-field textarea"
+                                                placeholder="Share your experience..." rows={4}
+                                                value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} />
                                         </div>
-
                                         <div className="review-form-actions">
                                             <button type="submit" className="btn btn-primary" disabled={reviewRating === 0}>
                                                 {editingReview ? 'Update Review' : 'Submit Review'}
                                             </button>
-                                            <button
-                                                type="button"
-                                                className="btn btn-ghost"
-                                                onClick={() => { setShowReviewForm(false); setEditingReview(false); setReviewRating(0); setReviewComment(''); }}
-                                            >
+                                            <button type="button" className="btn btn-ghost"
+                                                onClick={() => { setShowReviewForm(false); setEditingReview(false); setReviewRating(0); setReviewComment(''); }}>
                                                 Cancel
                                             </button>
                                         </div>
                                     </motion.form>
                                 )}
 
-                                {/* Review List */}
-                                {allReviews.length > 0 ? (
+                                {reviews.length > 0 ? (
                                     <div className="reviews-list">
-                                        {allReviews.map((review, i) => (
-                                            <motion.div
-                                                key={review.id}
-                                                className="review-item glass"
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: i * 0.05 }}
-                                            >
+                                        {reviews.map((review, i) => (
+                                            <motion.div key={review.id} className="review-item glass"
+                                                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                                                 <div className="review-item-header">
                                                     <div className="review-author">
-                                                        <div className="review-avatar">
-                                                            {review.userName.charAt(0)}
-                                                        </div>
+                                                        <div className="review-avatar">{(review.userName || 'U').charAt(0)}</div>
                                                         <div className="review-author-info">
                                                             <span className="review-author-name">
                                                                 {review.userName}
@@ -374,9 +314,7 @@ export default function ResourceDetail() {
                                                                     <span className="review-you-badge">You</span>
                                                                 )}
                                                             </span>
-                                                            {review.userCollege && (
-                                                                <span className="review-college">{review.userCollege}</span>
-                                                            )}
+                                                            {review.userCollege && <span className="review-college">{review.userCollege}</span>}
                                                         </div>
                                                     </div>
                                                     <div className="review-header-right">
@@ -387,20 +325,12 @@ export default function ResourceDetail() {
                                                         )}
                                                     </div>
                                                 </div>
-
-                                                {review.comment && (
-                                                    <p className="review-comment">{review.comment}</p>
-                                                )}
-
-                                                {/* Actions for own review */}
+                                                {review.comment && <p className="review-comment">{review.comment}</p>}
                                                 {user && review.userId === user.id && (
                                                     <div className="review-actions">
-                                                        <button className="btn btn-ghost btn-xs" onClick={handleEditReview}>
-                                                            <Edit3 size={12} /> Edit
-                                                        </button>
-                                                        <button className="btn btn-ghost btn-xs review-delete" onClick={() => handleDeleteReview(review.id)}>
-                                                            <Trash2 size={12} /> Delete
-                                                        </button>
+                                                        <button className="btn btn-ghost btn-xs" onClick={handleEditReview}><Edit3 size={12} /> Edit</button>
+                                                        <button className="btn btn-ghost btn-xs review-delete"
+                                                            onClick={() => handleDeleteReview(review.id)}><Trash2 size={12} /> Delete</button>
                                                     </div>
                                                 )}
                                             </motion.div>
@@ -432,10 +362,9 @@ export default function ResourceDetail() {
                                     <div className="detail-stat">
                                         <Star size={18} className="star-filled" />
                                         <span>{avgRating || '—'}</span>
-                                        <small>{reviewCount} Reviews</small>
+                                        <small>{reviews.length} Reviews</small>
                                     </div>
                                 </div>
-
                                 <button className="btn btn-primary action-btn" onClick={handleDownload}>
                                     <Download size={18} /> Download Resource
                                 </button>
@@ -444,12 +373,9 @@ export default function ResourceDetail() {
                                     {bookmarked ? 'Bookmarked' : 'Bookmark'}
                                 </button>
                                 <div className="action-row">
-                                    <button className="btn btn-ghost action-small" onClick={handleLike}>
-                                        <Heart size={16} /> Like
-                                    </button>
-                                    <button className="btn btn-ghost action-small" onClick={() => navigator.clipboard?.writeText(window.location.href)}>
-                                        <Share2 size={16} /> Share
-                                    </button>
+                                    <button className="btn btn-ghost action-small" onClick={handleLike}><Heart size={16} /> Like</button>
+                                    <button className="btn btn-ghost action-small"
+                                        onClick={() => navigator.clipboard?.writeText(window.location.href)}><Share2 size={16} /> Share</button>
                                 </div>
                             </div>
 

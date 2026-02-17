@@ -1,37 +1,31 @@
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-    User, Mail, Calendar, LogOut, Upload, Bookmark, Building2,
-    Trash2, BookOpen, FileText, FolderKanban, Library,
-    ClipboardList, GraduationCap, Lock, Globe, Heart, Download
+    User, BookOpen, Heart, Download, Bookmark,
+    Settings, LogOut, GraduationCap, Building2, Lock, Globe, Star
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import { useResources } from '../context/ResourceContext';
+import { useAuth } from '../context/AuthContext';
 import { RESOURCE_TYPES } from '../data/mockData';
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import './Profile.css';
-
-const iconMap = {
-    BookOpen, FileText, FolderKanban, Library, ClipboardList, GraduationCap,
-};
 
 export default function Profile() {
     const { user, isAuthenticated, logout, setShowAuthModal } = useAuth();
-    const { resources, deleteResource, getBookmarkedResources } = useResources();
+    const { resources, bookmarks, getAverageRating, getReviewsForResource } = useResources();
     const navigate = useNavigate();
-    const [tab, setTab] = useState('uploads');
+    const [activeTab, setActiveTab] = useState('uploads');
 
     if (!isAuthenticated) {
         return (
             <div className="profile-page">
                 <div className="container">
-                    <div className="auth-required glass">
-                        <User size={48} className="auth-icon" />
-                        <h2>Login Required</h2>
-                        <p>Log in to view your profile.</p>
+                    <div className="profile-auth glass">
+                        <User size={40} />
+                        <h2>Sign in to view your profile</h2>
+                        <p>Access your uploaded resources and settings.</p>
                         <button className="btn btn-primary" onClick={() => setShowAuthModal(true)}>
-                            Log In / Sign Up
+                            Sign In / Sign Up
                         </button>
                     </div>
                 </div>
@@ -39,158 +33,112 @@ export default function Profile() {
         );
     }
 
-    const myUploads = resources.filter(r => r.author === user.name);
-    const bookmarked = getBookmarkedResources();
-    const totalDownloads = myUploads.reduce((s, r) => s + r.downloads, 0);
-    const totalLikes = myUploads.reduce((s, r) => s + r.likes, 0);
-
-    const handleLogout = () => { logout(); navigate('/'); };
-
-    const handleDelete = (id) => {
-        if (window.confirm('Delete this resource?')) deleteResource(id);
+    const handleLogout = () => {
+        logout();
+        navigate('/');
     };
 
-    const activeList = tab === 'uploads' ? myUploads : bookmarked;
-
-    const formatDate = (d) =>
-        new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    const myResources = resources.filter(r => r.author === user.name);
+    const totalLikes = myResources.reduce((a, r) => a + (r.likes || 0), 0);
+    const totalDownloads = myResources.reduce((a, r) => a + (r.downloads || 0), 0);
 
     return (
         <div className="profile-page">
             <div className="container">
-                <div className="profile-layout">
-                    {/* User Card */}
-                    <motion.aside
-                        className="user-card glass"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                    >
-                        <div className="user-avatar-lg" style={{ background: 'var(--accent-primary)' }}>
-                            {user.name.charAt(0)}
-                        </div>
-                        <h2 className="user-name">{user.name}</h2>
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <div className="profile-layout">
+                        {/* User Card */}
+                        <aside className="profile-sidebar">
+                            <div className="user-card glass">
+                                <div className="user-avatar-lg">
+                                    {user.name.charAt(0)}
+                                </div>
+                                <h2 className="user-name">{user.name}</h2>
+                                <p className="user-email">{user.email}</p>
+                                {user.college && (
+                                    <div className="user-college"><Building2 size={14} /> {user.college}</div>
+                                )}
 
-                        <div className="user-detail">
-                            <Mail size={14} />
-                            <span>{user.email}</span>
-                        </div>
-                        <div className="user-detail">
-                            <Building2 size={14} />
-                            <span>{user.college || 'Not specified'}</span>
-                        </div>
-                        <div className="user-detail">
-                            <Calendar size={14} />
-                            <span>Joined {formatDate(user.joinedAt)}</span>
-                        </div>
+                                <div className="user-stats">
+                                    <div className="user-stat">
+                                        <span className="user-stat-value">{myResources.length}</span>
+                                        <span className="user-stat-label">Uploads</span>
+                                    </div>
+                                    <div className="user-stat">
+                                        <span className="user-stat-value">{totalLikes}</span>
+                                        <span className="user-stat-label">Likes</span>
+                                    </div>
+                                    <div className="user-stat">
+                                        <span className="user-stat-value">{totalDownloads}</span>
+                                        <span className="user-stat-label">Downloads</span>
+                                    </div>
+                                </div>
 
-                        <div className="user-stats">
-                            <div className="user-stat">
-                                <Upload size={16} />
-                                <span className="stat-value">{myUploads.length}</span>
-                                <span className="stat-label">Uploads</span>
+                                <button className="btn btn-ghost logout-btn" onClick={handleLogout}>
+                                    <LogOut size={16} /> Logout
+                                </button>
                             </div>
-                            <div className="user-stat">
-                                <Heart size={16} />
-                                <span className="stat-value">{totalLikes}</span>
-                                <span className="stat-label">Likes</span>
+                        </aside>
+
+                        {/* Main Content */}
+                        <main className="profile-main">
+                            <div className="profile-tabs">
+                                <button className={`profile-tab ${activeTab === 'uploads' ? 'active' : ''}`}
+                                    onClick={() => setActiveTab('uploads')}>
+                                    <BookOpen size={16} /> My Uploads
+                                </button>
+                                <button className={`profile-tab ${activeTab === 'bookmarks' ? 'active' : ''}`}
+                                    onClick={() => setActiveTab('bookmarks')}>
+                                    <Bookmark size={16} /> Bookmarks
+                                </button>
                             </div>
-                            <div className="user-stat">
-                                <Download size={16} />
-                                <span className="stat-value">{totalDownloads}</span>
-                                <span className="stat-label">Downloads</span>
-                            </div>
-                        </div>
 
-                        <button className="btn btn-danger logout-btn" onClick={handleLogout}>
-                            <LogOut size={16} /> Log Out
-                        </button>
-                    </motion.aside>
-
-                    {/* Content Area */}
-                    <motion.div
-                        className="profile-content"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                    >
-                        <div className="profile-tabs">
-                            <button className={`profile-tab ${tab === 'uploads' ? 'active' : ''}`} onClick={() => setTab('uploads')}>
-                                <Upload size={16} />
-                                My Uploads ({myUploads.length})
-                            </button>
-                            <button className={`profile-tab ${tab === 'bookmarks' ? 'active' : ''}`} onClick={() => setTab('bookmarks')}>
-                                <Bookmark size={16} />
-                                Bookmarks ({bookmarked.length})
-                            </button>
-                        </div>
-
-                        {activeList.length > 0 ? (
-                            <div className="profile-list">
-                                {activeList.map((r, i) => {
-                                    const typeInfo = RESOURCE_TYPES.find(t => t.id === r.type) || RESOURCE_TYPES[0];
-                                    const TypeIcon = iconMap[typeInfo.icon] || BookOpen;
-                                    const isPrivate = r.privacy === 'private';
-
-                                    return (
-                                        <motion.div
-                                            key={r.id}
-                                            className="profile-item glass"
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: i * 0.04 }}
-                                        >
-                                            <Link to={`/resource/${r.id}`} className="profile-item-link">
-                                                <div className="profile-item-icon" style={{ background: `${typeInfo.color}20`, color: typeInfo.color }}>
-                                                    <TypeIcon size={20} />
-                                                </div>
-                                                <div className="profile-item-info">
-                                                    <div className="profile-item-header">
-                                                        <h4>{r.title}</h4>
-                                                        <div className={`profile-privacy ${isPrivate ? 'private' : 'public'}`}>
-                                                            {isPrivate ? <Lock size={10} /> : <Globe size={10} />}
-                                                            {isPrivate ? 'Private' : 'Public'}
+                            {activeTab === 'uploads' ? (
+                                myResources.length > 0 ? (
+                                    <div className="profile-resources-list">
+                                        {myResources.map(r => {
+                                            const typeInfo = RESOURCE_TYPES.find(t => t.id === r.type) || RESOURCE_TYPES[0];
+                                            const avgRating = getAverageRating(r.id);
+                                            return (
+                                                <Link key={r.id} to={`/resource/${r.id}`} className="profile-resource-item glass">
+                                                    <div className="pri-header">
+                                                        <div className="pri-type" style={{ color: typeInfo.color }}>{typeInfo.label}</div>
+                                                        <div className={`privacy-badge ${r.privacy === 'private' ? 'private' : 'public'}`}>
+                                                            {r.privacy === 'private' ? <Lock size={11} /> : <Globe size={11} />}
+                                                            {r.privacy === 'private' ? 'Private' : 'Public'}
                                                         </div>
                                                     </div>
-                                                    <div className="profile-item-meta">
-                                                        <span>{r.subject}</span>
-                                                        <span>·</span>
-                                                        <span>{typeInfo.label}</span>
-                                                        {r.branch && (<><span>·</span><span>{r.branch}</span></>)}
-                                                        <span>·</span>
-                                                        <span>{formatDate(r.createdAt)}</span>
-                                                    </div>
-                                                    <div className="profile-item-stats">
+                                                    <h3 className="pri-title">{r.title}</h3>
+                                                    <p className="pri-subject">{r.subject}</p>
+                                                    {r.branch && <p className="pri-branch"><GraduationCap size={12} /> {r.branch}</p>}
+                                                    <div className="pri-stats">
                                                         <span><Heart size={12} /> {r.likes}</span>
                                                         <span><Download size={12} /> {r.downloads}</span>
-                                                        {r.rating > 0 && <span>⭐ {r.rating}</span>}
+                                                        {avgRating > 0 && <span><Star size={12} /> {avgRating}</span>}
                                                     </div>
-                                                </div>
-                                            </Link>
-                                            {tab === 'uploads' && (
-                                                <button className="delete-btn" title="Delete" onClick={() => handleDelete(r.id)}>
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            )}
-                                        </motion.div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="empty-state glass">
-                                {tab === 'uploads' ? <Upload size={40} /> : <Bookmark size={40} />}
-                                <h3>{tab === 'uploads' ? 'No Uploads Yet' : 'No Bookmarks Yet'}</h3>
-                                <p>
-                                    {tab === 'uploads'
-                                        ? 'Start sharing resources with the community!'
-                                        : 'Bookmark resources to save them for later.'}
-                                </p>
-                                {tab === 'uploads' && (
-                                    <Link to="/upload" className="btn btn-primary">Upload Resource</Link>
-                                )}
-                            </div>
-                        )}
-                    </motion.div>
-                </div>
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="profile-empty glass">
+                                        <BookOpen size={32} />
+                                        <h3>No uploads yet</h3>
+                                        <p>Share your academic resources with the community</p>
+                                        <Link to="/upload" className="btn btn-primary">Upload Resource</Link>
+                                    </div>
+                                )
+                            ) : (
+                                <div className="profile-empty glass">
+                                    <Bookmark size={32} />
+                                    <h3>{bookmarks.length > 0 ? `${bookmarks.length} bookmarked` : 'No bookmarks yet'}</h3>
+                                    <p>Browse and bookmark resources to find them later</p>
+                                    <Link to="/browse" className="btn btn-primary">Browse Resources</Link>
+                                </div>
+                            )}
+                        </main>
+                    </div>
+                </motion.div>
             </div>
         </div>
     );

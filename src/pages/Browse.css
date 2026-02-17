@@ -279,6 +279,105 @@
     font-size: var(--fs-sm);
 }
 
+/* Browse Search */
+.browse-search {
+    display: flex;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex: 1;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-xl);
+}
+
+.search-bar .input-field {
+    flex: 1;
+    border: none;
+    background: transparent;
+}
+
+.filter-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.filter-close-mobile {
+    display: none;
+}
+
+.filter-clear-btn {
+    width: 100%;
+    margin-top: var(--space-2);
+}
+
+/* Browse Layout */
+.browse-layout {
+    display: flex;
+    gap: var(--space-8);
+    align-items: flex-start;
+}
+
+.browse-layout.filters-open .filter-sidebar {
+    display: flex;
+}
+
+.browse-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.resources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-6);
+}
+
+/* Loading / Empty States */
+.browse-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-20) 0;
+    gap: var(--space-4);
+    color: var(--text-muted);
+}
+
+.browse-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--space-20) var(--space-8);
+    border-radius: var(--radius-xl);
+    gap: var(--space-4);
+    color: var(--text-muted);
+}
+
+.browse-empty h3 {
+    font-family: var(--font-display);
+    font-size: var(--fs-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.upload-error {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #fca5a5;
+    font-size: var(--fs-sm);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4);
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
     .results-grid {

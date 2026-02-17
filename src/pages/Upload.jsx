@@ -1,44 +1,41 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Upload as UploadIcon, FileText, X, Check, CloudUpload, Globe, Lock, Plus } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import {
+    Upload as UploadIcon, FileText, X, Plus, Lock, Globe
+} from 'lucide-react';
 import { useResources } from '../context/ResourceContext';
-import { SUBJECTS, RESOURCE_TYPES, SEMESTERS, YEARS, BRANCHES } from '../data/mockData';
+import { useAuth } from '../context/AuthContext';
+import { RESOURCE_TYPES, SUBJECTS, BRANCHES } from '../data/mockData';
 import './Upload.css';
 
-export default function Upload() {
-    const { isAuthenticated, user, setShowAuthModal } = useAuth();
-    const { addResource } = useResources();
+const SEMESTERS = ['1', '2', '3', '4', '5', '6', '7', '8'];
+const YEARS = ['2024', '2023', '2022', '2021', '2020'];
+
+export default function UploadPage() {
     const navigate = useNavigate();
-    const fileInputRef = useRef(null);
+    const { addResource } = useResources();
+    const { isAuthenticated, user, setShowAuthModal } = useAuth();
 
     const [form, setForm] = useState({
-        title: '',
-        description: '',
-        subject: '',
-        type: '',
-        semester: '',
-        year: '',
-        branch: '',
-        privacy: 'public',
-        tags: [],
+        title: '', description: '', subject: '', type: 'notes',
+        semester: '', year: '', branch: '', privacy: 'public',
     });
+    const [tags, setTags] = useState([]);
     const [tagInput, setTagInput] = useState('');
     const [file, setFile] = useState(null);
-    const [dragging, setDragging] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
+    const [dragOver, setDragOver] = useState(false);
 
     if (!isAuthenticated) {
         return (
             <div className="upload-page">
                 <div className="container">
-                    <div className="auth-required glass">
-                        <UploadIcon size={48} className="auth-icon" />
-                        <h2>Login Required</h2>
-                        <p>You need to be logged in to upload resources.</p>
+                    <div className="upload-auth glass">
+                        <UploadIcon size={40} />
+                        <h2>Sign in to Upload</h2>
+                        <p>You need an account to share resources with the community.</p>
                         <button className="btn btn-primary" onClick={() => setShowAuthModal(true)}>
-                            Log In / Sign Up
+                            Sign In / Sign Up
                         </button>
                     </div>
                 </div>
@@ -46,75 +43,57 @@ export default function Upload() {
         );
     }
 
-    const handleDrag = (e) => { e.preventDefault(); e.stopPropagation(); };
-    const handleDragIn = (e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); };
-    const handleDragOut = (e) => { e.preventDefault(); e.stopPropagation(); setDragging(false); };
-    const handleDrop = (e) => {
-        e.preventDefault(); e.stopPropagation(); setDragging(false);
-        if (e.dataTransfer.files?.[0]) setFile(e.dataTransfer.files[0]);
+    const handleChange = (e) => {
+        setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
-    const handleFileChange = (e) => {
-        if (e.target.files?.[0]) setFile(e.target.files[0]);
-    };
-
-    const updateForm = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
     const addTag = () => {
         const tag = tagInput.trim().toLowerCase();
-        if (tag && !form.tags.includes(tag) && form.tags.length < 8) {
-            setForm(prev => ({ ...prev, tags: [...prev.tags, tag] }));
+        if (tag && !tags.includes(tag) && tags.length < 10) {
+            setTags([...tags, tag]);
             setTagInput('');
         }
     };
 
-    const removeTag = (tag) => {
-        setForm(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tag) }));
-    };
+    const removeTag = (tag) => setTags(tags.filter(t => t !== tag));
 
     const handleTagKeyDown = (e) => {
-        if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); }
-        if (e.key === 'Backspace' && !tagInput && form.tags.length > 0) {
-            removeTag(form.tags[form.tags.length - 1]);
-        }
+        if (e.key === 'Enter') { e.preventDefault(); addTag(); }
+    };
+
+    const handleFileDrop = (e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const dropped = e.dataTransfer?.files[0];
+        if (dropped) setFile(dropped);
+    };
+
+    const handleFileChange = (e) => {
+        if (e.target.files[0]) setFile(e.target.files[0]);
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!form.title || !form.subject || !form.type) return;
+        if (!form.title.trim() || !form.subject) return;
 
-        addResource({
+        const resourceData = {
             ...form,
+            tags,
             author: user.name,
             authorCollege: user.college,
-            authorAvatar: null,
-            fileUrl: '#',
-        });
+            fileName: file?.name || '',
+            fileSize: file?.size || 0,
+        };
 
-        setSubmitted(true);
-        setTimeout(() => navigate('/browse'), 2000);
+        const newResource = addResource(resourceData);
+        navigate(`/resource/${newResource.id}`);
     };
 
-    if (submitted) {
-        return (
-            <div className="upload-page">
-                <div className="container">
-                    <motion.div
-                        className="upload-success glass"
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ duration: 0.5, type: 'spring' }}
-                    >
-                        <div className="success-icon">
-                            <Check size={40} />
-                        </div>
-                        <h2>Resource Uploaded Successfully!</h2>
-                        <p>Your resource is now available for other students.</p>
-                        <p className="redirect-note">Redirecting to browse page...</p>
-                    </motion.div>
-                </div>
-            </div>
-        );
-    }
+    const formatSize = (bytes) => {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(1) + ' MB';
+    };
 
     return (
         <div className="upload-page">
@@ -122,193 +101,171 @@ export default function Upload() {
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4 }}
                 >
-                    <h1 className="section-title">Upload Resource</h1>
-                    <p className="section-subtitle">Share your academic materials with the community</p>
-                </motion.div>
+                    <div className="upload-header">
+                        <h1>Upload Resource</h1>
+                        <p className="upload-subtitle">Share your academic resources with the community</p>
+                    </div>
 
-                <form className="upload-form" onSubmit={handleSubmit}>
-                    <div className="upload-grid">
-                        {/* Left: File Upload + Privacy */}
-                        <motion.div
-                            className="upload-left"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.4, delay: 0.1 }}
-                        >
-                            <div
-                                className={`dropzone glass ${dragging ? 'dragging' : ''} ${file ? 'has-file' : ''}`}
-                                onDragEnter={handleDragIn}
-                                onDragLeave={handleDragOut}
-                                onDragOver={handleDrag}
-                                onDrop={handleDrop}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileChange}
-                                    className="file-input"
-                                    accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.zip,.rar"
-                                />
-                                {file ? (
-                                    <div className="file-preview">
-                                        <FileText size={40} className="file-icon" />
-                                        <p className="file-name">{file.name}</p>
-                                        <p className="file-size">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                                        <button type="button" className="btn btn-ghost file-remove" onClick={(e) => { e.stopPropagation(); setFile(null); }}>
-                                            <X size={16} /> Remove
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="dropzone-content">
-                                        <CloudUpload size={48} className="dropzone-icon" />
-                                        <h3>Drag & drop your file here</h3>
-                                        <p>or click to browse</p>
-                                        <span className="dropzone-hint">PDF, DOC, PPT, ZIP (max 50MB)</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Privacy Setting */}
-                            <div className="privacy-card glass">
-                                <h3 className="privacy-title">Access Control</h3>
-                                <p className="privacy-desc">
-                                    Choose who can view and download this resource
-                                </p>
-                                <div className="privacy-options">
-                                    <button
-                                        type="button"
-                                        className={`privacy-option ${form.privacy === 'public' ? 'active public' : ''}`}
-                                        onClick={() => updateForm('privacy', 'public')}
-                                    >
-                                        <Globe size={20} />
-                                        <div>
-                                            <strong>Public</strong>
-                                            <span>Anyone from any college can access</span>
+                    <form className="upload-form" onSubmit={handleSubmit}>
+                        <div className="upload-grid">
+                            {/* Left column */}
+                            <div className="upload-left">
+                                {/* File Drop Zone */}
+                                <div
+                                    className={`drop-zone glass ${dragOver ? 'drag-over' : ''} ${file ? 'has-file' : ''}`}
+                                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                                    onDragLeave={() => setDragOver(false)}
+                                    onDrop={handleFileDrop}
+                                    onClick={() => document.getElementById('file-input').click()}
+                                >
+                                    <input id="file-input" type="file" hidden onChange={handleFileChange} />
+                                    {file ? (
+                                        <div className="file-preview">
+                                            <FileText size={32} />
+                                            <div className="file-info">
+                                                <span className="file-name">{file.name}</span>
+                                                <span className="file-size">{formatSize(file.size)}</span>
+                                            </div>
+                                            <button type="button" className="btn btn-ghost btn-icon" onClick={(e) => { e.stopPropagation(); setFile(null); }}>
+                                                <X size={16} />
+                                            </button>
                                         </div>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`privacy-option ${form.privacy === 'private' ? 'active private' : ''}`}
-                                        onClick={() => updateForm('privacy', 'private')}
-                                    >
-                                        <Lock size={20} />
-                                        <div>
-                                            <strong>Private</strong>
-                                            <span>Only students from {user.college} can access</span>
+                                    ) : (
+                                        <>
+                                            <UploadIcon size={40} />
+                                            <h3>Drop your file here</h3>
+                                            <p>or click to browse (PDF, DOCX, PPT, Images)</p>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Resource Details */}
+                                <div className="form-card glass">
+                                    <h3>Resource Details</h3>
+
+                                    <div className="input-group">
+                                        <label htmlFor="title">Title *</label>
+                                        <input id="title" name="title" className="input-field" placeholder="e.g. Data Structures Notes"
+                                            value={form.title} onChange={handleChange} required />
+                                    </div>
+
+                                    <div className="input-group">
+                                        <label htmlFor="description">Description</label>
+                                        <textarea id="description" name="description" className="input-field textarea"
+                                            placeholder="What's in this resource?" rows={3}
+                                            value={form.description} onChange={handleChange} />
+                                    </div>
+
+                                    <div className="input-row">
+                                        <div className="input-group">
+                                            <label htmlFor="subject">Subject *</label>
+                                            <select id="subject" name="subject" className="input-field"
+                                                value={form.subject} onChange={handleChange} required>
+                                                <option value="">Select</option>
+                                                {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
                                         </div>
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        {/* Right: Form Fields */}
-                        <motion.div
-                            className="upload-right"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.4, delay: 0.2 }}
-                        >
-                            <div className="form-card glass">
-                                <div className="input-group">
-                                    <label htmlFor="upload-title">Title *</label>
-                                    <input
-                                        id="upload-title"
-                                        type="text"
-                                        className="input-field"
-                                        placeholder="e.g. Data Structures — Complete Notes"
-                                        value={form.title}
-                                        onChange={(e) => updateForm('title', e.target.value)}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="input-group">
-                                    <label htmlFor="upload-desc">Description</label>
-                                    <textarea
-                                        id="upload-desc"
-                                        className="input-field textarea"
-                                        placeholder="Describe what this resource covers..."
-                                        rows={4}
-                                        value={form.description}
-                                        onChange={(e) => updateForm('description', e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="form-row">
-                                    <div className="input-group">
-                                        <label htmlFor="upload-subject">Subject *</label>
-                                        <select id="upload-subject" className="input-field" value={form.subject} onChange={(e) => updateForm('subject', e.target.value)} required>
-                                            <option value="">Select subject</option>
-                                            {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
+                                        <div className="input-group">
+                                            <label htmlFor="type">Type *</label>
+                                            <select id="type" name="type" className="input-field"
+                                                value={form.type} onChange={handleChange} required>
+                                                {RESOURCE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div className="input-group">
-                                        <label htmlFor="upload-type">Resource Type *</label>
-                                        <select id="upload-type" className="input-field" value={form.type} onChange={(e) => updateForm('type', e.target.value)} required>
-                                            <option value="">Select type</option>
-                                            {RESOURCE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
 
-                                <div className="form-row">
+                                    <div className="input-row">
+                                        <div className="input-group">
+                                            <label htmlFor="semester">Semester</label>
+                                            <select id="semester" name="semester" className="input-field"
+                                                value={form.semester} onChange={handleChange}>
+                                                <option value="">Select</option>
+                                                {SEMESTERS.map(s => <option key={s} value={s}>Sem {s}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="input-group">
+                                            <label htmlFor="year">Year</label>
+                                            <select id="year" name="year" className="input-field"
+                                                value={form.year} onChange={handleChange}>
+                                                <option value="">Select</option>
+                                                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
                                     <div className="input-group">
-                                        <label htmlFor="upload-branch">Branch / Department</label>
-                                        <select id="upload-branch" className="input-field" value={form.branch} onChange={(e) => updateForm('branch', e.target.value)}>
-                                            <option value="">Select branch</option>
+                                        <label htmlFor="branch">Branch / Department</label>
+                                        <select id="branch" name="branch" className="input-field"
+                                            value={form.branch} onChange={handleChange}>
+                                            <option value="">Select</option>
                                             {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
                                         </select>
                                     </div>
-                                    <div className="input-group">
-                                        <label htmlFor="upload-semester">Semester</label>
-                                        <select id="upload-semester" className="input-field" value={form.semester} onChange={(e) => updateForm('semester', e.target.value)}>
-                                            <option value="">Select semester</option>
-                                            {SEMESTERS.map(s => <option key={s} value={s}>{s} Semester</option>)}
-                                        </select>
-                                    </div>
                                 </div>
+                            </div>
 
-                                <div className="input-group">
-                                    <label htmlFor="upload-year">Year</label>
-                                    <select id="upload-year" className="input-field" value={form.year} onChange={(e) => updateForm('year', e.target.value)}>
-                                        <option value="">Select year</option>
-                                        {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                                    </select>
+                            {/* Right column */}
+                            <div className="upload-right">
+                                {/* Privacy */}
+                                <div className="form-card glass">
+                                    <h3>Privacy Level</h3>
+                                    <div className="privacy-cards">
+                                        <div
+                                            className={`privacy-card ${form.privacy === 'public' ? 'selected' : ''}`}
+                                            onClick={() => setForm(prev => ({ ...prev, privacy: 'public' }))}
+                                        >
+                                            <Globe size={24} />
+                                            <strong>Public</strong>
+                                            <p>Anyone can view and download</p>
+                                        </div>
+                                        <div
+                                            className={`privacy-card ${form.privacy === 'private' ? 'selected' : ''}`}
+                                            onClick={() => setForm(prev => ({ ...prev, privacy: 'private' }))}
+                                        >
+                                            <Lock size={24} />
+                                            <strong>Private</strong>
+                                            <p>Only {user.college} students</p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Tags */}
-                                <div className="input-group">
-                                    <label>Tags / Keywords</label>
-                                    <div className="tags-input-wrap">
-                                        {form.tags.map(tag => (
-                                            <span key={tag} className="tag-chip">
-                                                {tag}
-                                                <button type="button" onClick={() => removeTag(tag)}><X size={12} /></button>
-                                            </span>
-                                        ))}
-                                        <input
-                                            type="text"
-                                            className="tag-input"
-                                            placeholder={form.tags.length === 0 ? 'Type and press Enter...' : 'Add more...'}
-                                            value={tagInput}
-                                            onChange={(e) => setTagInput(e.target.value)}
-                                            onKeyDown={handleTagKeyDown}
-                                        />
+                                <div className="form-card glass">
+                                    <h3>Tags / Keywords</h3>
+                                    <div className="tag-input-wrapper">
+                                        <div className="tags-display">
+                                            {tags.map(tag => (
+                                                <span key={tag} className="tag-chip">
+                                                    {tag}
+                                                    <button type="button" onClick={() => removeTag(tag)}><X size={12} /></button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <div className="tag-input-row">
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                placeholder="Add tag..."
+                                                value={tagInput}
+                                                onChange={(e) => setTagInput(e.target.value)}
+                                                onKeyDown={handleTagKeyDown}
+                                            />
+                                            <button type="button" className="btn btn-secondary btn-icon" onClick={addTag}>
+                                                <Plus size={18} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <small className="tag-hint">{form.tags.length}/8 tags · Press Enter or comma to add</small>
                                 </div>
 
+                                {/* Submit */}
                                 <button type="submit" className="btn btn-primary upload-submit">
-                                    <UploadIcon size={18} />
-                                    Upload Resource
+                                    <UploadIcon size={18} /> Upload Resource
                                 </button>
                             </div>
-                        </motion.div>
-                    </div>
-                </form>
+                        </div>
+                    </form>
+                </motion.div>
             </div>
         </div>
     );
