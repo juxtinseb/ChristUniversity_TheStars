@@ -24,13 +24,13 @@ export function AuthProvider({ children }) {
         }
     }, [user]);
 
-    const login = (email, password) => {
-        // Mock login — accept any credentials
+    const login = (email, password, college) => {
         const name = email.split('@')[0];
         const mockUser = {
             id: 'user_' + Date.now(),
             name: name.charAt(0).toUpperCase() + name.slice(1),
             email,
+            college: college || 'Christ University',
             avatar: null,
             joinedAt: new Date().toISOString(),
         };
@@ -39,11 +39,12 @@ export function AuthProvider({ children }) {
         return mockUser;
     };
 
-    const signup = (name, email, password) => {
+    const signup = (name, email, password, college) => {
         const mockUser = {
             id: 'user_' + Date.now(),
             name,
             email,
+            college: college || 'Christ University',
             avatar: null,
             joinedAt: new Date().toISOString(),
         };
@@ -56,6 +57,13 @@ export function AuthProvider({ children }) {
         setUser(null);
     };
 
+    const canAccessResource = (resource) => {
+        if (!resource) return false;
+        if (resource.privacy === 'public') return true;
+        if (!user) return false;
+        return user.college === resource.authorCollege;
+    };
+
     return (
         <AuthContext.Provider value={{
             user,
@@ -65,6 +73,7 @@ export function AuthProvider({ children }) {
             logout,
             showAuthModal,
             setShowAuthModal,
+            canAccessResource,
         }}>
             {children}
         </AuthContext.Provider>

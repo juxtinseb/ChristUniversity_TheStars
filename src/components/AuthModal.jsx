@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Mail, Lock, User, GraduationCap } from 'lucide-react';
+import { X, Mail, Lock, User, GraduationCap, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { COLLEGES } from '../data/mockData';
 import './AuthModal.css';
 
 export default function AuthModal({ onClose }) {
@@ -8,14 +9,15 @@ export default function AuthModal({ onClose }) {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [college, setCollege] = useState('');
     const { login, signup } = useAuth();
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (tab === 'login') {
-            login(email, password);
+            login(email, password, college);
         } else {
-            signup(name, email, password);
+            signup(name, email, password, college);
         }
     };
 
@@ -101,6 +103,26 @@ export default function AuthModal({ onClose }) {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
+                        </div>
+                    </div>
+
+                    <div className="input-group">
+                        <label htmlFor="auth-college">College / Institution *</label>
+                        <div className="input-with-icon">
+                            <Building2 size={18} />
+                            <select
+                                id="auth-college"
+                                className="input-field"
+                                value={college}
+                                onChange={(e) => setCollege(e.target.value)}
+                                required
+                                style={{ paddingLeft: '42px', width: '100%' }}
+                            >
+                                <option value="">Select your college</option>
+                                {COLLEGES.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
